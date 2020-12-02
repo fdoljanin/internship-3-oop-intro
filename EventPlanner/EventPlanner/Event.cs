@@ -10,6 +10,9 @@ namespace EventPlanner
     }
     class Event
     {
+        public Event() { }
+        public Event(string name, TypeEvent eventType, DateTime startTime, DateTime endTime)
+        => (Name, EventType, StartTime, EndTime) = (name, eventType, startTime, endTime);
         public string Name { get; set; }
         public TypeEvent EventType { get; set; }
         public DateTime StartTime { get; set; }

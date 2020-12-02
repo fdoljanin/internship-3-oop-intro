@@ -5,10 +5,15 @@ namespace EventPlanner
 {
     class Program
     {
-        static Dictionary<Event, List<Person>> events;
+        static Dictionary<Event, List<Person>> events = new Dictionary<Event, List<Person>>();
 
         static void Main(string[] args)
         {
+            /*AddOrEditEvent();
+            EventList();
+            EventDeleteOption();
+            EventList();*/
+
         }
 
         static void ColorText(string message, ConsoleColor color)
@@ -34,6 +39,28 @@ namespace EventPlanner
             return Console.ReadLine();
         }
 
+
+        static (bool doesKeep, string name) FindNameOrQuit(string message, bool needsUnique)
+        {
+            var name = WriteRead(message).Trim();
+            var isUniqueName = true;
+            if (name == "") return (false, "");
+            foreach (var eventIterator in events.Keys)
+            {
+                if (eventIterator.Name.ToLower() == name.ToLower()) isUniqueName = false;
+            }
+            if (needsUnique == isUniqueName) return (true, name);
+            var alert = needsUnique && !isUniqueName ? "Ime već postoji!" : "Taj event ne postoji!";
+            ColorText(alert, ConsoleColor.Yellow);
+            return FindNameOrQuit(message, needsUnique);
+        }
+                
+
+        static void EventList()
+        {
+            Console.WriteLine("Popis evenata:");
+            foreach (var eventPrint in events.Keys) Console.WriteLine(eventPrint.Name);
+        }
         static void MainMenu()
         {
             var optionsMessage = @"1. Dodajte event
@@ -46,14 +73,16 @@ namespace EventPlanner
             Console.WriteLine(optionsMessage);
         }
 
-        static void AddEvent()
+        static bool AddOrEditEvent(bool isEdit = false)
         {
-            ColorText("NOVI EVENT; enter za povratak", ConsoleColor.DarkMagenta);
-            var name = WriteRead("Ime eventa:");
+            if (!isEdit) ColorText("NOVI EVENT; enter za povratak", ConsoleColor.DarkMagenta);
+            var nameInput = FindNameOrQuit("Unesite novo ime:",true);
+            if (!nameInput.doesKeep) return false;
             TypeEvent eventType;
             while (true)
             {
-                var eventTypeInput = WriteRead("Vrsta eventa:");
+                var eventTypeInput = WriteRead("Tip eventa:");
+                if (eventTypeInput == "") return false;
                 if (!Enum.TryParse(typeof(TypeEvent), eventTypeInput, out object eventTypeOut))
                 {
                     ColorText("Unos nije ispravan! \n", ConsoleColor.Yellow);
@@ -65,17 +94,77 @@ namespace EventPlanner
             DateTime start = new DateTime(), end = new DateTime();
             while (true)
             {
-                string dateInput = WriteRead("Vrijeme početka i završetka eventa u obliku dd/mm/yy hh:mm:ss, odvojeni zarezom:");
+                var dateInput = WriteRead("Vrijeme početka i završetka eventa u obliku dd/mm/yyyy hh:mm:ss, odvojeni zarezom:");
+                if (dateInput == "") return false;
                 if (!(dateInput.Contains(",") && DateTime.TryParse(dateInput.Split(",")[0], out start) && DateTime.TryParse(dateInput.Split(",")[1], out end)))
                 {
                     ColorText("Unos nije ispravnog formata!\n", ConsoleColor.Yellow);
+                    continue;
                 }
-                else if (start.Ticks > end.Ticks)
+                if (start > end)
                 {
                     ColorText("Događaj ne može završiti prije nego što je počeo!\n", ConsoleColor.Red);
+                    continue;
                 }
-                else break;
+                Func<DateTime, DateTime, DateTime, bool> between = (intervalStart, intervalEnd, time) => (time >= intervalStart && time <= intervalEnd);
+                foreach (var eventKey in events)
+                {
+                    if (between(eventKey.Key.StartTime, eventKey.Key.EndTime, start)
+                        || between(eventKey.Key.StartTime, eventKey.Key.EndTime, end)
+                        || between(start, end, eventKey.Key.StartTime)
+                        || between(start, end, eventKey.Key.EndTime))
+                    {
+                        ColorText("Dio intervala je već zauzet!", ConsoleColor.Yellow);
+                        continue;
+                    }
+                }
+                break;
             }
+            var newEvent = new Event(nameInput.name, eventType, start, end);
+            events.Add(newEvent, new List<Person>());
+            return true;
+        }
+
+
+        static void EventDeleteOption()
+        {
+            ColorText("BRIŠETE EVENT; enter za povratak:", ConsoleColor.Red);
+            EventList();
+            var nameInput = FindNameOrQuit("Unesite ime eventa kojeg želite obrisati:", false);
+            if (!nameInput.doesKeep) return;
+            else events.Remove(ReturnEventCopy(nameInput.name).Key);
+            ColorText("Event obrisan.", ConsoleColor.Green);
+        }
+
+        static KeyValuePair<Event, List<Person>> ReturnEventCopy (string name)
+        {
+            foreach (var eventToCopy in events)
+            {
+                if (name.ToLower() == eventToCopy.Key.Name.ToLower())
+                {
+                    return eventToCopy;
+                }
+            }
+            return new KeyValuePair<Event, List<Person>>(); //just that compiler isn't angry
+        }
+        static void EventEdit()
+        {
+            ColorText("UREĐIVANJE EVENTA; enter za povratak:", ConsoleColor.DarkMagenta);
+            EventList();
+            var nameInput = FindNameOrQuit("Unesite ime eventa kojeg želite urediti:", false);
+            if (!nameInput.doesKeep) return;
+            var editEventCopy = ReturnEventCopy(nameInput.name);
+            ColorText("Staro ime: " + editEventCopy.Key.Name, ConsoleColor.DarkGray);
+            ColorText("Stari tip: " + editEventCopy.Key.EventType, ConsoleColor.DarkGray);
+            ColorText("Stari početak: " + editEventCopy.Key.StartTime + " stari kraj: " + editEventCopy.Key.EndTime, ConsoleColor.DarkGray);
+            //EventDeleter(nameInput.name);
+            events.Remove(editEventCopy.Key);
+            if (!AddOrEditEvent(true)) //if we quit edit
+            {
+                events.Add(editEventCopy.Key, editEventCopy.Value);
+            }
+            else ColorText("Event uređen!", ConsoleColor.Green);
+
         }
 
     }
