@@ -23,14 +23,19 @@ namespace EventPlanner
             Console.ForegroundColor = ConsoleColor.White;
         }
 
-        static (bool doesQuit, bool isInt, int number) ValidNumber()
+        static (bool doesKeep, int number) ValidNumber(string message)
         {
-            var input = Console.ReadLine().Trim();
-            if (input == "") return (false, false, -1);
+
+            var input = WriteRead(message).Trim();
+            if (input == "") return (false, -1);
             int number;
             var success = int.TryParse(input, out number);
-            if (success) return (false, true, number);
-            else return (false, false, -1);
+            if (success) return (true, number);
+            else {
+                ColorText("Unesite broj!\n", ConsoleColor.Yellow);
+                return ValidNumber(message);
+            }
+
         }
 
         static string WriteRead(string message)
@@ -128,7 +133,7 @@ namespace EventPlanner
 
         static void EventDeleteOption()
         {
-            ColorText("BRIŠETE EVENT; enter za povratak:", ConsoleColor.Red);
+            ColorText("BRIŠETE EVENT; enter za povratak", ConsoleColor.Red);
             EventList();
             var nameInput = FindNameOrQuit("Unesite ime eventa kojeg želite obrisati:", false);
             if (!nameInput.doesKeep) return;
@@ -167,5 +172,76 @@ namespace EventPlanner
 
         }
 
+        static (bool doesKeep, int identificator, bool isExisting, Person outPerson) FindIdentificatornOrQuit(string message, bool needsUnique, string eventName)
+        {
+            var personCopy = new Person();
+            var identificatorInput = ValidNumber("Unesite OIB:");
+            if (!identificatorInput.doesKeep) return (false, -1, false, personCopy);
+            var inThisEvent = false;
+            var inDictionary = false;
+
+            foreach (var eventCheck in events.Keys)
+            {
+                foreach (var person in events[eventCheck])
+                {
+                    if (person.Identificator == identificatorInput.number)
+                    {
+                        if (eventCheck.Name == eventName) inThisEvent = true;
+                        else inDictionary = true;
+                        personCopy = person;
+                        break;
+                    }
+
+                }
+            }
+
+            if (needsUnique && inThisEvent)
+            {
+                ColorText("Osoba ovog OIB-a već je u eventu.", ConsoleColor.Yellow);
+                return FindIdentificatornOrQuit(message, needsUnique, eventName);
+            }
+            else if (!needsUnique && inThisEvent)
+            {
+                ColorText("Osoba ovog OIB-a nije u eventu.", ConsoleColor.Yellow);
+                return FindIdentificatornOrQuit(message, needsUnique, eventName);
+            }
+            else return (true, identificatorInput.number, inDictionary, personCopy);
+
+        }
+        static void AddPerson()
+        {
+            ColorText("DODAVANJE OSOBA NA EVENT; esc za povratak", ConsoleColor.Cyan);
+            var eventNameInput = FindNameOrQuit("Unesite ime eventa kojem želite dodati osobu:", false);
+            if (!eventNameInput.doesKeep) return;
+            var identificationInput = FindIdentificatornOrQuit("Unesite OIB osobe:", true, eventNameInput.name);
+            if (!identificationInput.doesKeep) return;
+            if (identificationInput.isExisting) //if person with same identification exist in dictionary
+            {
+                events[ReturnEventCopy(eventNameInput.name).Key].Add(identificationInput.outPerson);
+                ColorText($"Osoba {identificationInput.outPerson.FirstName} dodana.", ConsoleColor.Green);
+                AddPerson();
+                return;
+            }
+            var personFirstName = WriteRead("Unesite ime osobe:");
+            if (personFirstName == "") return;
+            var personLastName = WriteRead("Unesite prezime osobe:");
+            if (personLastName == "") return;
+            var phoneInput = ValidNumber("Unesite broj telefona osobe:");
+            if (!phoneInput.doesKeep) return;
+            var newPerson = new Person(personFirstName, personLastName, identificationInput.identificator, phoneInput.number);
+            events[ReturnEventCopy(eventNameInput.name).Key].Add(newPerson);
+        }
+
+        static void RemovePerson()
+        {
+            ColorText("BRISANJE OSOBA S EVENTA; esc za povratak", ConsoleColor.Cyan);
+            var eventNameInput = FindNameOrQuit("Unesite ime eventa kojem želite dodati osobu:", false);
+            if (!eventNameInput.doesKeep) return;
+            var identificationInput = FindIdentificatornOrQuit("Unesite OIB osobe koju želite obrisati:", false, eventNameInput.name);
+            if (!identificationInput.doesKeep) return;
+            events[ReturnEventCopy(eventNameInput.name).Key].Remove(identificationInput.outPerson);
+            ColorText("Osoba izbrisana.", ConsoleColor.Green);
+            RemovePerson();
+        }
     }
 }
