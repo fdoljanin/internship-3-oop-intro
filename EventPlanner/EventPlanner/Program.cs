@@ -13,6 +13,8 @@ namespace EventPlanner
             EventList();
             EventDeleteOption();
             EventList();*/
+            MainMenu();
+
 
         }
 
@@ -25,7 +27,6 @@ namespace EventPlanner
 
         static (bool doesKeep, int number) ValidNumber(string message)
         {
-
             var input = WriteRead(message).Trim();
             if (input == "") return (false, -1);
             int number;
@@ -38,16 +39,36 @@ namespace EventPlanner
 
         }
 
-        static string WriteRead(string message)
+        static string WriteRead(string message, bool isSubmenu = false)
         {
             Console.WriteLine(message);
-            return Console.ReadLine();
+            var output = Console.ReadLine().Trim();
+            if (!isSubmenu && output == "")
+            { 
+                Console.Clear();
+                MainMenu();
+            }
+            else if (isSubmenu && output == "")
+            {
+                Console.Clear();
+                SubMenu();
+            }
+            return output;
+        }
+
+        static void SuccessMessage(string message)
+        {
+            ColorText(message, ConsoleColor.Green);
+            ColorText("Pritisnite enter za povratak", ConsoleColor.Gray);
+            Console.ReadLine();
+            Console.Clear();
+            MainMenu();
         }
 
 
-        static (bool doesKeep, string name) FindNameOrQuit(string message, bool needsUnique)
+        static (bool doesKeep, string name) FindNameOrQuit(string message, bool needsUnique, bool isSubmenu=false)
         {
-            var name = WriteRead(message).Trim();
+            var name = WriteRead(message, isSubmenu).Trim();
             var isUniqueName = true;
             if (name == "") return (false, "");
             foreach (var eventIterator in events.Keys)
@@ -66,19 +87,67 @@ namespace EventPlanner
             Console.WriteLine("Popis evenata:");
             foreach (var eventPrint in events.Keys) Console.WriteLine(eventPrint.Name);
         }
+
+        static void EventDetail()
+        {
+            var nameInput = FindNameOrQuit("Unesite ime eventa čije detalje želite; enter za return:", false, true);
+            if (!nameInput.doesKeep) return;
+            var eventToShow = ReturnEventCopy(nameInput.name).Key;
+            Console.WriteLine($"{eventToShow.Name} --  {eventToShow.EventType} -- {eventToShow.StartTime} -- {eventToShow.EndTime} -- {events[eventToShow].Count}");
+            EventDetail();
+        }
+
+        static void PersonList()
+        {
+            var nameInput = FindNameOrQuit("Unesite ime eventa čije članove želite; enter za return:", false, true);
+            if (!nameInput.doesKeep) return;
+            var personsToShow = ReturnEventCopy(nameInput.name).Value;
+            Console.WriteLine("Lista osoba:");
+            for (int i = 0; i < personsToShow.Count; ++i)
+            {
+                Console.WriteLine($"{i}. {personsToShow[i].FirstName} -- {personsToShow[i].LastName} -- {personsToShow[i].Phone}");
+            }
+     
+            PersonList();
+        }
+
+        static void AllDetail()
+        {
+            var nameInput = FindNameOrQuit("Unesite ime eventa čije detalje želite; enter za return:", false, true);
+            if (!nameInput.doesKeep) return;
+            var eventToShow = ReturnEventCopy(nameInput.name);
+            Console.WriteLine($"{eventToShow.Key.Name} --  {eventToShow.Key.EventType} -- {eventToShow.Key.StartTime} -- {eventToShow.Key.EndTime} -- {eventToShow.Value.Count}");
+            Console.WriteLine("Lista osoba:");
+            for (int i = 0; i < eventToShow.Value.Count; ++i)
+            {
+                Console.WriteLine($"{i}. {eventToShow.Value[i].FirstName} -- {eventToShow.Value[i].LastName} -- {eventToShow.Value[i].Phone}");
+            }
+        }
+
         static void MainMenu()
         {
-            var optionsMessage = @"1. Dodajte event
+            var optionsString = @"1. Dodajte event
 2. Obrišite event
 3. Edit event
 4. Dodajte osobu na event
 5. Uklonite osobu s eventa
 6. Ispišite detalje eventa
 7. Ugasite aplikaciju";
-            Console.WriteLine(optionsMessage);
+            var options = new List<Action>() { () => AddOrEditEvent(), EventDeleteOption, EventEdit, AddPerson, RemovePerson, SubMenu, ()=>ColorText("Gašenje...",ConsoleColor.Blue)};
+            var optionInput = ValidNumber(optionsString);
+            if (optionInput.number > 7 || optionInput.number < 1)
+            {
+                ColorText("Unos izvan granica!\n", ConsoleColor.Yellow);
+                Console.Clear();
+                MainMenu();
+                return;
+            }
+            Console.Clear();
+            options[optionInput.number-1]();
         }
 
-        static bool AddOrEditEvent(bool isEdit = false)
+
+        static bool AddOrEditEvent(bool isEdit = false, List<Person> persons = null)
         {
             if (!isEdit) ColorText("NOVI EVENT; enter za povratak", ConsoleColor.DarkMagenta);
             var nameInput = FindNameOrQuit("Unesite novo ime:",true);
@@ -112,6 +181,7 @@ namespace EventPlanner
                     continue;
                 }
                 Func<DateTime, DateTime, DateTime, bool> between = (intervalStart, intervalEnd, time) => (time >= intervalStart && time <= intervalEnd);
+                bool isBusy = false;
                 foreach (var eventKey in events)
                 {
                     if (between(eventKey.Key.StartTime, eventKey.Key.EndTime, start)
@@ -120,13 +190,16 @@ namespace EventPlanner
                         || between(start, end, eventKey.Key.EndTime))
                     {
                         ColorText("Dio intervala je već zauzet!", ConsoleColor.Yellow);
-                        continue;
+                        isBusy = true;
                     }
                 }
+                if (isBusy) continue;
                 break;
             }
             var newEvent = new Event(nameInput.name, eventType, start, end);
-            events.Add(newEvent, new List<Person>());
+            if (!isEdit) events.Add(newEvent, new List<Person>()); //to avoid null reference
+            else events.Add(newEvent, persons);
+            if (!isEdit) SuccessMessage("Event dodan!");
             return true;
         }
 
@@ -162,13 +235,12 @@ namespace EventPlanner
             ColorText("Staro ime: " + editEventCopy.Key.Name, ConsoleColor.DarkGray);
             ColorText("Stari tip: " + editEventCopy.Key.EventType, ConsoleColor.DarkGray);
             ColorText("Stari početak: " + editEventCopy.Key.StartTime + " stari kraj: " + editEventCopy.Key.EndTime, ConsoleColor.DarkGray);
-            //EventDeleter(nameInput.name);
             events.Remove(editEventCopy.Key);
-            if (!AddOrEditEvent(true)) //if we quit edit
+            if (!AddOrEditEvent(true, editEventCopy.Value)) //if we quit edit
             {
                 events.Add(editEventCopy.Key, editEventCopy.Value);
             }
-            else ColorText("Event uređen!", ConsoleColor.Green);
+            else SuccessMessage("Even uređen!");
 
         }
 
@@ -230,18 +302,41 @@ namespace EventPlanner
             if (!phoneInput.doesKeep) return;
             var newPerson = new Person(personFirstName, personLastName, identificationInput.identificator, phoneInput.number);
             events[ReturnEventCopy(eventNameInput.name).Key].Add(newPerson);
+            SuccessMessage("Osoba dodana!");
         }
 
         static void RemovePerson()
         {
-            ColorText("BRISANJE OSOBA S EVENTA; esc za povratak", ConsoleColor.Cyan);
+            ColorText("BRISANJE OSOBA S EVENTA; esc za povratak", ConsoleColor.Red);
             var eventNameInput = FindNameOrQuit("Unesite ime eventa kojem želite dodati osobu:", false);
             if (!eventNameInput.doesKeep) return;
             var identificationInput = FindIdentificatornOrQuit("Unesite OIB osobe koju želite obrisati:", false, eventNameInput.name);
             if (!identificationInput.doesKeep) return;
             events[ReturnEventCopy(eventNameInput.name).Key].Remove(identificationInput.outPerson);
-            ColorText("Osoba izbrisana.", ConsoleColor.Green);
+            SuccessMessage("Osoba izbrisana!");
             RemovePerson();
+
+        }
+
+        static void SubMenu()
+        {
+            var optionsString = @"
+Submenu:
+1. Ispiši detalje eventa
+2. Ispiši sve sudionike
+3. Ispiši sve detalje
+4. Povratak
+            ";
+            var options = new List<Action>() { EventDetail, PersonList, AllDetail, MainMenu };
+            var optionInput = ValidNumber(optionsString);
+            if (!optionInput.doesKeep) return;
+            if (optionInput.number > 4 || optionInput.number < 1)
+            {
+                ColorText("Unos izvan granica!", ConsoleColor.Yellow);
+                SubMenu();
+                return;
+            }
+            options[optionInput.number]();
         }
     }
 }
