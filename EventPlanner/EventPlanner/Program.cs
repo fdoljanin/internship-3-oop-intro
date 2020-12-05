@@ -32,6 +32,9 @@ namespace EventPlanner
             }
         };
 
+        public static void Empty() { //used as empty base function
+
+        }
 
         static void Main(string[] args)
         {
@@ -51,7 +54,7 @@ namespace EventPlanner
                 if (eventIterator.Name.ToLower() == nameInput.userInput.ToLower()) isUniqueName = false;
             }
             if (needsUnique == isUniqueName) return (true, nameInput.userInput);
-            var alert = needsUnique && !isUniqueName ? "Ime već postoji!" : "Taj event ne postoji!";
+            var alert = needsUnique ? "Ime već postoji!" : "Taj event ne postoji!";
             InteractionHelper.ColorText(alert, ConsoleColor.Yellow);
             return FindNameOrQuit(message, needsUnique, baseFunction);
         }
@@ -92,7 +95,7 @@ namespace EventPlanner
             Console.Clear();
             if (optionInput.number > 7 || optionInput.number < 1)
             {
-                InteractionHelper.ColorText("Unos izvan granica!\n", ConsoleColor.Yellow);
+                InteractionHelper.ColorText("Unos izvan granica!", ConsoleColor.Yellow);
                 MainMenu();
                 return;
             }
@@ -103,16 +106,18 @@ namespace EventPlanner
         static bool AddOrEditEvent(bool isEdit = false, List<Person> persons = null)
         {
             if (!isEdit) InteractionHelper.ColorText("NOVI EVENT; enter za povratak", ConsoleColor.DarkMagenta);
-            var nameInput = FindNameOrQuit("Unesite novo ime:", true, MainMenu);
+            Action  baseFunction = MainMenu;
+            if (isEdit) baseFunction = Empty;
+            var nameInput = FindNameOrQuit("Unesite novo ime:", true, baseFunction);
             if (!nameInput.doesKeep) return false;
             TypeEvent eventType;
             while (true)
             {
-                var eventTypeInput = InteractionHelper.WriteRead("Tip eventa (Coffee, Lecture, Concert, StudySession):", MainMenu);
+                var eventTypeInput = InteractionHelper.WriteRead("Tip eventa (Coffee, Lecture, Concert, StudySession):", baseFunction);
                 if (!eventTypeInput.doesKeep) return false;
                 if (!Enum.TryParse(typeof(TypeEvent), eventTypeInput.userInput, out object eventTypeOut))
                 {
-                    InteractionHelper.ColorText("Unos nije ispravan! \n", ConsoleColor.Yellow);
+                    InteractionHelper.ColorText("Unos nije ispravan!", ConsoleColor.Yellow);
                     continue;
                 }
                 eventType = (TypeEvent) eventTypeOut;
@@ -121,7 +126,7 @@ namespace EventPlanner
             DateTime start = new DateTime(), end = new DateTime();
             while (true)
             {
-                var dateInput = InteractionHelper.WriteRead("Vrijeme početka i završetka eventa u obliku dd/mm/yyyy hh:mm, odvojeni zarezom:", MainMenu);
+                var dateInput = InteractionHelper.WriteRead("Vrijeme početka i završetka eventa u obliku dd/mm/yyyy hh:mm, odvojeni zarezom:", baseFunction);
                 if (!dateInput.doesKeep) return false;
                 if (!(dateInput.userInput.Contains(",") && DateTime.TryParse(dateInput.userInput.Split(",")[0], out start) && DateTime.TryParse(dateInput.userInput.Split(",")[1], out end)))
                 {
@@ -164,8 +169,12 @@ namespace EventPlanner
             EventList();
             var nameInput = FindNameOrQuit("Unesite ime eventa kojeg želite obrisati:", false, MainMenu);
             if (!nameInput.doesKeep) return;
-            else events.Remove(ReturnEventCopy(nameInput.name).Key);
-            InteractionHelper.SuccessMessage("Event obrisan!", MainMenu);
+            if (InteractionHelper.ConfirmChange("Želite li obrisati event?"))
+            {
+                events.Remove(ReturnEventCopy(nameInput.name).Key);
+                InteractionHelper.SuccessMessage("Event obrisan!", MainMenu);
+            }
+            else InteractionHelper.SuccessMessage("Akcija poništena.", MainMenu);
         }
 
         static void EventEdit() 
@@ -182,20 +191,20 @@ namespace EventPlanner
             if (!AddOrEditEvent(true, editEventCopy.Value)) 
             {
                 events.Add(editEventCopy.Key, editEventCopy.Value);
+                MainMenu();
             }
-            else InteractionHelper.SuccessMessage("Even uređen!", MainMenu);
+            else InteractionHelper.SuccessMessage("Event uređen!", MainMenu);
 
         }
 
 
-        static (bool doesKeep, int identificator, bool isExisting, Person outPerson) FindIdentificatornOrQuit(string message, bool needsUnique, string eventName) 
+        static (bool doesKeep, int identificator, bool isExisting, Person outPerson) FindIdentificatorOrQuit(string message, bool needsUnique, string eventName) 
         {
             var personCopy = new Person();
             var identificatorInput = InteractionHelper.GetNumberOrQuit("Unesite OIB:", MainMenu);
             if (!identificatorInput.doesKeep) return (false, -1, false, personCopy);
             var inThisEvent = false;
             var inDictionary = false;
-
             foreach (var eventCheck in events.Keys)
             {
                 foreach (var person in events[eventCheck])
@@ -215,12 +224,12 @@ namespace EventPlanner
             if (needsUnique && inThisEvent)
             {
                 InteractionHelper.ColorText("Osoba ovog OIB-a već je u eventu.", ConsoleColor.Yellow);
-                return FindIdentificatornOrQuit(message, needsUnique, eventName);
+                return FindIdentificatorOrQuit(message, needsUnique, eventName);
             }
             else if (!needsUnique && !inThisEvent)
             {
                 InteractionHelper.ColorText("Osoba ovog OIB-a nije u eventu.", ConsoleColor.Yellow);
-                return FindIdentificatornOrQuit(message, needsUnique, eventName);
+                return FindIdentificatorOrQuit(message, needsUnique, eventName);
             }
 
             else return (true, identificatorInput.number, inDictionary, personCopy);
@@ -231,15 +240,15 @@ namespace EventPlanner
         static void AddPerson()
         {
             InteractionHelper.ColorText("DODAVANJE OSOBA NA EVENT; esc za povratak", ConsoleColor.Cyan);
+            EventList();
             var eventNameInput = FindNameOrQuit("Unesite ime eventa kojem želite dodati osobu:", false, MainMenu);
             if (!eventNameInput.doesKeep) return;
-            var identificationInput = FindIdentificatornOrQuit("Unesite OIB osobe:", true, eventNameInput.name);
+            var identificationInput = FindIdentificatorOrQuit("Unesite OIB osobe:", true, eventNameInput.name);
             if (!identificationInput.doesKeep) return;
             if (identificationInput.isExisting) //if person with same identification exist in dictionary
             {
                 events[ReturnEventCopy(eventNameInput.name).Key].Add(identificationInput.outPerson);
-                InteractionHelper.ColorText($"Osoba {identificationInput.outPerson.FirstName} dodana.", ConsoleColor.Green);
-                AddPerson();
+                InteractionHelper.SuccessMessage($"Osoba {identificationInput.outPerson.FirstName} dodana!", MainMenu);
                 return;
             }
             var personFirstName = InteractionHelper.WriteRead("Unesite ime osobe:", MainMenu);
@@ -257,15 +266,19 @@ namespace EventPlanner
         static void RemovePerson() 
         {
             InteractionHelper.ColorText("BRISANJE OSOBA S EVENTA; esc za povratak", ConsoleColor.Red);
+            EventList();
             var eventNameInput = FindNameOrQuit("Unesite ime eventa kojem želite obrisati osobu:", false, MainMenu);
             if (!eventNameInput.doesKeep) return;
             var eventCopy = ReturnEventCopy(eventNameInput.name).Key;
             eventCopy.ShowPersonList();
-            var identificationInput = FindIdentificatornOrQuit("Unesite OIB osobe koju želite obrisati:", false, eventNameInput.name);
+            var identificationInput = FindIdentificatorOrQuit("Unesite OIB osobe koju želite obrisati:", false, eventNameInput.name);
             if (!identificationInput.doesKeep) return;
-            events[eventCopy].Remove(identificationInput.outPerson);
-            InteractionHelper.SuccessMessage("Osoba izbrisana!", MainMenu);
-            RemovePerson();
+
+            if (InteractionHelper.ConfirmChange("Želite li uistinu obrisati osobu?"))
+            {
+                events[eventCopy].Remove(identificationInput.outPerson);
+                InteractionHelper.SuccessMessage("Osoba izbrisana!", MainMenu);
+            } else InteractionHelper.SuccessMessage("Akcija poništena.", MainMenu);
 
         }
 
@@ -293,6 +306,7 @@ namespace EventPlanner
                 MainMenu();
                 return;
             }
+            EventList();
             EventDetailOption(optionInput.number);
         }
 

@@ -34,7 +34,7 @@ namespace EventPlanner
             if (success) return (true, number);
             else
             {
-                ColorText("Unesite broj!\n", ConsoleColor.Yellow);
+                ColorText("Unos nije broj!", ConsoleColor.Yellow);
                 return GetNumberOrQuit(message, baseFunction);
             }
 
@@ -43,10 +43,22 @@ namespace EventPlanner
         public static void SuccessMessage(string message, Action baseFunction) 
         {
             ColorText(message, ConsoleColor.Green);
-            ColorText("Pritisnite enter za povratak", ConsoleColor.Gray);
+            ColorText("Pritisnite enter za povratak...", ConsoleColor.Gray);
             Console.ReadLine();
             Console.Clear();
             baseFunction();
+        }
+
+        public static bool ConfirmChange(string message)
+        {
+            ColorText(message + " (da/ne)", ConsoleColor.Red);
+            while (true)
+            {
+                string choice = Console.ReadLine().ToLower().Trim();
+                if (choice == "da") return true;
+                if (choice == "ne") return false;
+                ColorText("Odgovor nije prepoznat, upišite ponovno. (da/ne)", ConsoleColor.Yellow);
+            }
         }
 
     }
