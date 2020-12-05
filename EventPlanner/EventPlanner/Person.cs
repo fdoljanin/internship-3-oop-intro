@@ -4,7 +4,7 @@ using System.Text;
 
 namespace EventPlanner
 {
-    class Person
+    public class Person
     {
         public Person() { }
         public Person(string firstName, string lastName, int identificator, int phone)
@@ -13,5 +13,9 @@ namespace EventPlanner
         public string LastName { get; set; }
         public int Identificator { get; set; } //name for OIB
         public int Phone { get; set; }
+        public void ShowPerson()
+        {
+            Console.WriteLine($"{FirstName} -- {LastName} -- {Phone} (oib: {Identificator})"); 
+        }
     }
 }

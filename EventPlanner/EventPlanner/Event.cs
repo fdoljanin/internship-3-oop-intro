@@ -4,11 +4,11 @@ using System.Text;
 
 namespace EventPlanner
 {
-    enum TypeEvent
+    public enum TypeEvent
     {
         Coffee, Lecture, Concert, StudySession
     }
-    class Event
+    public class Event
     {
         public Event() { }
         public Event(string name, TypeEvent eventType, DateTime startTime, DateTime endTime)
@@ -17,5 +17,21 @@ namespace EventPlanner
         public TypeEvent EventType { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
+
+        public void ShowDetail() 
+        {
+            Console.WriteLine($"{Name} --  {EventType} -- {StartTime} -- {EndTime} -- {Program.events[this].Count}");
+        }
+
+        public void ShowPersonList() 
+        {
+            Console.WriteLine("Lista osoba:");
+            for (var i = 0; i < Program.events[this].Count; ++i)
+            {
+                Console.Write(i+1 + ". "); 
+                Program.events[this][i].ShowPerson();
+            }
+
+        }
     }
 }
